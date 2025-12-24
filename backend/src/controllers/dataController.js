@@ -6,7 +6,7 @@ const Gateway = require('../models/GatewayModel');
 const WateringHistory = require('../models/WateringHistoryModel'); 
 const { Op } = require('sequelize');
 
-// --- 1. LẤY DANH SÁCH GATEWAY ---
+// --- 1. GET GATEWAY LIST ---
 exports.getAllGateways = async (req, res) => {
     try {
         const gateways = await Gateway.findAll({
@@ -14,12 +14,12 @@ exports.getAllGateways = async (req, res) => {
         });
         res.status(200).json({ status: 'success', data: gateways });
     } catch (error) {
-        console.error("Lỗi getAllGateways:", error);
-        res.status(500).json({ message: 'Lỗi server lấy danh sách Gateway' });
+        console.error("Error getAllGateways:", error);
+        res.status(500).json({ message: 'Server error fetching Gateway list' });
     }
 };
 
-// --- 2. LẤY DANH SÁCH NODE ---
+// --- 2. GET NODE LIST ---
 exports.getAllNodes = async (req, res) => {
     try {
         const nodes = await SensorNode.findAll({
@@ -31,12 +31,12 @@ exports.getAllNodes = async (req, res) => {
         });
         res.status(200).json({ status: 'success', data: nodes });
     } catch (error) {
-        console.error("Lỗi getAllNodes:", error);
-        res.status(500).json({ message: 'Lỗi server lấy danh sách Node' });
+        console.error("Error getAllNodes:", error);
+        res.status(500).json({ message: 'Server error fetching Node list' });
     }
 };
 
-// --- 3. LẤY DỮ LIỆU DASHBOARD ---
+// --- 3. GET DASHBOARD DATA (LATEST) ---
 exports.getLatestData = async (req, res) => {
     try {
         const nodes = await SensorNode.findAll({
@@ -53,7 +53,7 @@ exports.getLatestData = async (req, res) => {
                 node_id: node.id,
                 gateway_id: node.gateway_id,
                 device_eui: node.device_eui,
-                location: node.Gateway ? node.Gateway.location : 'Chưa định vị',
+                location: node.Gateway ? node.Gateway.location : 'Unlocated',
                 soil_moisture: latestData ? latestData.soil_moisture : 0,
                 air_humidity: latestData ? latestData.air_humidity : 0,
                 temperature: latestData ? latestData.temperature : 0,
@@ -65,16 +65,17 @@ exports.getLatestData = async (req, res) => {
 
         res.status(200).json({ status: 'success', data: result });
     } catch (error) {
-        console.error("Lỗi getLatestData:", error);
-        res.status(500).json({ message: 'Lỗi server Dashboard.' });
+        console.error("Error getLatestData:", error);
+        res.status(500).json({ message: 'Server error Dashboard data.' });
     }
 };
 
-// --- 4. LẤY LỊCH SỬ CẢM BIẾN ---
+// --- 4. GET SENSOR HISTORY (FIXED) ---
 exports.getHistoryData = async (req, res) => {
     try {
         const { nodeId, limit } = req.query;
-        const limitRecord = limit ? parseInt(limit) : 50; 
+        // Default limit increased to 200 for better chart visualization
+        const limitRecord = limit ? parseInt(limit) : 200; 
         const whereCondition = {};
         if (nodeId) whereCondition.node_id = nodeId;
 
@@ -84,35 +85,36 @@ exports.getHistoryData = async (req, res) => {
             limit: limitRecord,
             include: [{ 
                 model: SensorNode, 
-                attributes: ['device_eui', 'id'],
+                // 👇 IMPORTANT FIX: Added 'gateway_id' here so Frontend can filter
+                attributes: ['device_eui', 'id', 'gateway_id'], 
                 include: [{
                     model: Gateway,
-                    attributes: ['location', 'client_id']
+                    // 👇 Added 'id' here as well for safety
+                    attributes: ['location', 'client_id', 'id'] 
                 }]
             }]
         });
         
         res.status(200).json({ status: 'success', data: history }); 
     } catch (error) {
-        console.error("Lỗi getHistoryData:", error);
-        res.status(500).json({ message: 'Lỗi server lấy lịch sử.' });
+        console.error("Error getHistoryData:", error);
+        res.status(500).json({ message: 'Server error fetching history.' });
     }
 };
 
-// --- 5. LẤY LỊCH SỬ TƯỚI (ĐÃ SỬA: CHỈ INCLUDE GATEWAY) ---
+// --- 5. GET WATERING LOGS ---
 exports.getWateringLogs = async (req, res) => {
     try {
         const logs = await WateringHistory.findAll({
             limit: 50,
             order: [['command_time', 'DESC']],
-            // 👇 Chỉ lấy thông tin Gateway
             include: [
-                { model: Gateway, attributes: ['location', 'client_id'] }
+                { model: Gateway, attributes: ['location', 'client_id', 'id'] }
             ]
         });
         res.status(200).json({ status: 'success', data: logs });
     } catch (error) {
-        console.error("Lỗi getWateringLogs:", error);
-        res.status(500).json({ message: 'Lỗi server lấy lịch sử tưới.' });
+        console.error("Error getWateringLogs:", error);
+        res.status(500).json({ message: 'Server error fetching watering logs.' });
     }
 };
